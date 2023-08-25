@@ -44,24 +44,26 @@ skins.update_player_skin = function(player)
 	skins.save()
 end
 
-skins.formspec = {}
-skins.formspec.main = function(name)
-	page = skins.pages[name]
+skins.get_formspec = function(player, context)
+	local name = player:get_player_name()
+
+	local page = skins.pages[name]
 	if page == nil then page = 0 end
-	local formspec = "size[8,7.5]"
-		.. "button[0,0;2,.5;main;Back]"
+
+	local formspec = ""
+
 	if skins.get_type(skins.skins[name]) == skins.type.MODEL then
 		formspec = formspec
 			.. "image[0,.75;1,2;"..skins.skins[name].."_preview.png]"
 			.. "image[1,.75;1,2;"..skins.skins[name].."_preview_back.png]"
 			.. "label[6,.5;Raw texture:]"
 			.. "image[6,1;2,1;"..skins.skins[name]..".png]"
-		
 	else
 		formspec = formspec
 			.. "image[0,.75;1,2;"..skins.skins[name]..".png]"
 			.. "image[1,.75;1,2;"..skins.skins[name].."_back.png]"
 	end
+
 	local meta = skins.meta[skins.skins[name]]
 	if meta then
 		if meta.name then
@@ -77,6 +79,7 @@ skins.formspec.main = function(name)
 			formspec = formspec .. 'label[2,2;"'..meta.comment..'"]'
 		end
 	end
+
 	local index = 0
 	local skip = 0 -- Skip skins, used for pages
 	for i, skin in ipairs(skins.list) do
@@ -91,18 +94,21 @@ skins.formspec.main = function(name)
 			index = index +1
 		end
 	end
+
 	if page > 0 then
 		formspec = formspec .. "button[0,7;1,.5;skins_page_"..(page-1)..";<<]"
 	else
 		formspec = formspec .. "button[0,7;1,.5;skins_page_"..page..";<<]"
 	end
+
 	formspec = formspec .. "button[.75,7;6.5,.5;skins_page_"..page..";Page "..(page+1).."/"..math.floor(#skins.list/16+1).."]" -- a button is used so text is centered
 	if index > 16 then
 		formspec = formspec .. "button[7,7;1,.5;skins_page_"..(page+1)..";>>]"
 	else
 		formspec = formspec .. "button[7,7;1,.5;skins_page_"..page..";>>]"
 	end
-	return formspec
+
+	return sfinv.make_formspec(player, context, formspec)
 end
 
 skins.pages = {}
@@ -113,9 +119,33 @@ minetest.register_on_joinplayer(function(player)
 		skins.skins[player:get_player_name()] = skins.default()
 	end
 	skins.update_player_skin(player)
-	inventory_plus.register_button(player,"skins","Skin")
+	--inventory_plus.register_button(player,"skins","Skin")
 end)
 
+sfinv.register_page("skins:skins", {
+	title = "Skins",
+
+	get = function(self, player, context)
+		return skins.get_formspec(player, context)
+	end,
+
+	on_player_receive_fields = function(self, player, context, fields)
+		for field, _ in pairs(fields) do
+			if string.sub(field,0,string.len("skins_set_")) == "skins_set_" then
+				skins.skins[player:get_player_name()] = skins.list[tonumber(string.sub(field,string.len("skins_set_")+1))]
+				skins.update_player_skin(player)
+				sfinv.set_player_inventory_formspec(player, context)
+			end
+
+			if string.sub(field,0,string.len("skins_page_")) == "skins_page_" then
+				skins.pages[player:get_player_name()] = tonumber(string.sub(field,string.len("skins_page_")+1))
+				sfinv.set_player_inventory_formspec(player, context)
+			end
+		end
+	end
+})
+
+--[[
 minetest.register_on_player_receive_fields(function(player,formname,fields)
 	if fields.skins then
 		inventory_plus.set_inventory_formspec(player,skins.formspec.main(player:get_player_name()))
@@ -132,4 +162,4 @@ minetest.register_on_player_receive_fields(function(player,formname,fields)
 		end
 	end
 end)
-
+--]]
